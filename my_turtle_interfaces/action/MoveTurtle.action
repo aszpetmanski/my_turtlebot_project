@@ -1,0 +1,8 @@
+float32 linear_vel_x
+float32 angular_vel_z
+int32 duration_s
+---
+float32 distance_covered
+int32 time_left
+---
+bool result

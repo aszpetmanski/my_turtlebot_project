@@ -23,6 +23,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
     TurtleController() : LifecycleNode("turtle_controller") {
         this->declare_parameter("turtle_name", "turtle1");
         turtle_name_ = this->get_parameter("turtle_name").as_string();
+        action_server_activated_ = false;
         RCLCPP_INFO(this->get_logger(), "Turtle controller initialized. Waiting for configuration.");
     }
 
@@ -48,6 +49,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         turtle_name_.c_str()
     );
 
+
         return LifecycleCallbackReturn::SUCCESS;
 
     }
@@ -57,8 +59,43 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
 
         kill_client_.reset();
         spawn_client_.reset();
+        cmd_vel_publisher_.reset();
         move_turtle_server_.reset();
         cb_group_.reset();
+
+        action_server_activated_ = false;
+        //TO DO WYJEB WSZYSTKO CO STWORZYLES
+
+        return LifecycleCallbackReturn::SUCCESS;
+    }
+
+    LifecycleCallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) override {
+        (void)previous_state;
+
+        action_server_activated_ = true;
+        RCLCPP_INFO(this->get_logger(), "Node activated.");
+        return LifecycleCallbackReturn::SUCCESS;
+    }
+
+    LifecycleCallbackReturn on_deactivate(const rclcpp_lifecycle::State &previous_state) override {
+        (void)previous_state;
+
+        action_server_activated_ = false;
+
+        return LifecycleCallbackReturn::SUCCESS;
+    }
+
+    LifecycleCallbackReturn on_shutdown(const rclcpp_lifecycle::State &previous_state) override {
+        (void)previous_state;
+
+        kill_client_.reset();
+        spawn_client_.reset();
+        cmd_vel_publisher_.reset();
+        move_turtle_server_.reset();
+        cb_group_.reset();
+
+        action_server_activated_ = false;
+        
 
         return LifecycleCallbackReturn::SUCCESS;
     }
@@ -67,12 +104,26 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         (void)uuid;
         (void)goal;
 
+        if (!action_server_activated_) {
+            RCLCPP_WARN(this->get_logger(), "Server not active yet");
+            return rclcpp_action::GoalResponse::REJECT;
+        }
+        // TO DO ODRZUC GOAL JAK MASZ AKTYWNY
+
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (this->goal_handle_ && this->goal_handle_->is_active()) {
+                RCLCPP_WARN(this->get_logger(), "Rejecting the goal because another is active");
+                return rclcpp_action::GoalResponse::REJECT;
+            }
+        }
+
+        RCLCPP_INFO(this->get_logger(), "Acepting the goal.");
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
     rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
         (void)goal_handle;
-
 
         return rclcpp_action::CancelResponse::ACCEPT;
     }
@@ -84,7 +135,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
             std::lock_guard<std::mutex> lock(mutex_);
             this->goal_handle_ = goal_handle;
         }
-
+        RCLCPP_INFO(this->get_logger(), "Calling execute!");
         execute(goal_handle);
     }
 
@@ -106,6 +157,14 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         RCLCPP_INFO(this->get_logger(), "Start executing the goal.");
 
         while (rclcpp::ok()) {
+
+            if (goal_handle->is_canceling()) {
+                result->success = false;
+                goal_handle->canceled(result);
+                RCLCPP_WARN(this->get_logger(), "Canceled the goal.");
+                return;
+            }
+
 
             if ((this->now() - start_time) >= duration) {
 
@@ -135,6 +194,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
     private:
 
     std::string turtle_name_;
+    bool action_server_activated_;
     std::mutex mutex_;
     
 

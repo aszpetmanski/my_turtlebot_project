@@ -1,3 +1,7 @@
 /turtle_controller:
   ros__parameters:
     turtle_name: "alan1"
+
+/lifecycle_manager:
+  ros__parameters:
+    managed_node_name: "turtle_controller"

@@ -1,3 +1,6 @@
 <launch>
     <node pkg="turtlesim" exec="turtlesim_node" name="turtlesim_node" output="screen" />
+    <node pkg="my_turtle_controller" exec="turtle_controller" name="turtle_controller" output="screen">
+        <param from="$(find-pkg-share my_turtle_bringup)/config/turtle_controller.yaml" />
+    </node>
 </launch>

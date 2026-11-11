@@ -14,8 +14,16 @@ find_package(ament_cmake REQUIRED)
 install(DIRECTORY 
 
   launch
+  scripts
+  config
   
   DESTINATION share/${PROJECT_NAME}/
+)
+
+install(
+  PROGRAMS
+    scripts/lifecycle_manager.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()

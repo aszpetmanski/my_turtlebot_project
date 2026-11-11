@@ -1,0 +1,3 @@
+/turtle_controller:
+  ros__parameters:
+    turtle_name: "alan1"

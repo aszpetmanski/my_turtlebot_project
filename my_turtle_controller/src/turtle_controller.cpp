@@ -11,6 +11,8 @@
 
 
 
+using KillTurtle = turtlesim::srv::Kill;
+using SpawnTurtle = turtlesim::srv::Spawn;
 using LifecycleCallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 using MoveTurtle = my_turtle_interfaces::action::MoveTurtle;
 using MoveTurtleGoalHandle = rclcpp_action::ServerGoalHandle<MoveTurtle>;
@@ -21,7 +23,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
     public:
 
     TurtleController() : LifecycleNode("turtle_controller") {
-        this->declare_parameter("turtle_name", "turtle1");
+        this->declare_parameter("turtle_name", "alan");
         turtle_name_ = this->get_parameter("turtle_name").as_string();
         action_server_activated_ = false;
         RCLCPP_INFO(this->get_logger(), "Turtle controller initialized. Waiting for configuration.");
@@ -46,9 +48,13 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         this->get_logger(),
         "Turtle controller configured for '%s'. Action server: 'move_turtle_%s'.",
         turtle_name_.c_str(),
-        turtle_name_.c_str()
-    );
+        turtle_name_.c_str());
+        
+        // Kill turtle
+        kill_turtle();
+        spawn_turtle();
 
+        // Spawn turtle
 
         return LifecycleCallbackReturn::SUCCESS;
 
@@ -98,6 +104,26 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         
 
         return LifecycleCallbackReturn::SUCCESS;
+    }
+
+    void kill_turtle() {
+        kill_client_->wait_for_service();
+
+        auto request = std::make_shared<KillTurtle::Request>();
+        request->name = "turtle1";
+
+        kill_client_->async_send_request(request);
+    }
+
+    void spawn_turtle() {
+        spawn_client_->wait_for_service();
+
+        auto request = std::make_shared<SpawnTurtle::Request>();
+        request->name = turtle_name_;
+        request->x = 5.54;
+        request->y = 5.54;
+        
+        spawn_client_->async_send_request(request);
     }
 
     rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveTurtle::Goal> goal) {

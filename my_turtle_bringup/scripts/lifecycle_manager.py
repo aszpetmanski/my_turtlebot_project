@@ -8,7 +8,7 @@ import time
 
 class LifecycleNodeManager(Node): 
     def __init__(self):
-        super().__init__("lifecycle_manager_node")
+        super().__init__("lifecycle_manager")
 
         self.declare_parameter("managed_node_name", rclpy.Parameter.Type.STRING)
         self.managed_node_name = self.get_parameter("managed_node_name").value

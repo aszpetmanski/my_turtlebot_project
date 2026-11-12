@@ -1,35 +1,14 @@
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp_action/rclcpp_action.hpp"
-#include "rclcpp_lifecycle/lifecycle_node.hpp"
-
-#include "turtlesim/srv/kill.hpp"
-#include "turtlesim/srv/spawn.hpp"
-#include "my_turtle_interfaces/action/move_turtle.hpp"
-#include "geometry_msgs/msg/twist.hpp"
-
-#include <mutex>
+#include "my_turtle_controller/turtle_controller.hpp"
 
 
-
-using KillTurtle = turtlesim::srv::Kill;
-using SpawnTurtle = turtlesim::srv::Spawn;
-using LifecycleCallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
-using MoveTurtle = my_turtle_interfaces::action::MoveTurtle;
-using MoveTurtleGoalHandle = rclcpp_action::ServerGoalHandle<MoveTurtle>;
-using namespace std::chrono_literals;
-
-class TurtleController : public rclcpp_lifecycle::LifecycleNode {
-
-    public:
-
-    TurtleController() : LifecycleNode("turtle_controller") {
+    TurtleController::TurtleController() : LifecycleNode("turtle_controller") {
         this->declare_parameter("turtle_name", "alan");
         turtle_name_ = this->get_parameter("turtle_name").as_string();
         action_server_activated_ = false;
         RCLCPP_INFO(this->get_logger(), "Turtle controller initialized. Waiting for configuration.");
-    }
+    };
 
-    LifecycleCallbackReturn on_configure(const rclcpp_lifecycle::State &previous_state) override {
+    LifecycleCallbackReturn TurtleController::on_configure(const rclcpp_lifecycle::State &previous_state) {
         (void)previous_state;
 
         kill_client_ = this->create_client<turtlesim::srv::Kill>("kill");
@@ -52,15 +31,15 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         
         // Kill turtle
         kill_turtle();
+        // Spawn turtle
         spawn_turtle();
 
-        // Spawn turtle
 
         return LifecycleCallbackReturn::SUCCESS;
 
     }
 
-    LifecycleCallbackReturn on_cleanup(const rclcpp_lifecycle::State &previous_state) override {
+    LifecycleCallbackReturn TurtleController::on_cleanup(const rclcpp_lifecycle::State &previous_state) {
         (void)previous_state;
 
         kill_client_.reset();
@@ -70,12 +49,11 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         cb_group_.reset();
 
         action_server_activated_ = false;
-        //TO DO WYJEB WSZYSTKO CO STWORZYLES
 
         return LifecycleCallbackReturn::SUCCESS;
     }
 
-    LifecycleCallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) override {
+    LifecycleCallbackReturn TurtleController::on_activate(const rclcpp_lifecycle::State &previous_state) {
         (void)previous_state;
 
         action_server_activated_ = true;
@@ -83,7 +61,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         return LifecycleCallbackReturn::SUCCESS;
     }
 
-    LifecycleCallbackReturn on_deactivate(const rclcpp_lifecycle::State &previous_state) override {
+    LifecycleCallbackReturn TurtleController::on_deactivate(const rclcpp_lifecycle::State &previous_state) {
         (void)previous_state;
 
         action_server_activated_ = false;
@@ -91,7 +69,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         return LifecycleCallbackReturn::SUCCESS;
     }
 
-    LifecycleCallbackReturn on_shutdown(const rclcpp_lifecycle::State &previous_state) override {
+    LifecycleCallbackReturn TurtleController::on_shutdown(const rclcpp_lifecycle::State &previous_state) {
         (void)previous_state;
 
         kill_client_.reset();
@@ -106,7 +84,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         return LifecycleCallbackReturn::SUCCESS;
     }
 
-    void kill_turtle() {
+    void TurtleController::kill_turtle() {
         kill_client_->wait_for_service();
 
         auto request = std::make_shared<KillTurtle::Request>();
@@ -115,7 +93,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         kill_client_->async_send_request(request);
     }
 
-    void spawn_turtle() {
+    void TurtleController::spawn_turtle() {
         spawn_client_->wait_for_service();
 
         auto request = std::make_shared<SpawnTurtle::Request>();
@@ -126,7 +104,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         spawn_client_->async_send_request(request);
     }
 
-    rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveTurtle::Goal> goal) {
+    rclcpp_action::GoalResponse TurtleController::handle_goal(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const MoveTurtle::Goal> goal) {
         (void)uuid;
         (void)goal;
 
@@ -134,7 +112,6 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
             RCLCPP_WARN(this->get_logger(), "Server not active yet");
             return rclcpp_action::GoalResponse::REJECT;
         }
-        // TO DO ODRZUC GOAL JAK MASZ AKTYWNY
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -148,13 +125,13 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
-    rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
+    rclcpp_action::CancelResponse TurtleController::handle_cancel(const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
         (void)goal_handle;
 
         return rclcpp_action::CancelResponse::ACCEPT;
     }
 
-    void handle_accepted(const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
+    void TurtleController::handle_accepted(const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
         (void)goal_handle;
 
         {
@@ -165,7 +142,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
         execute(goal_handle);
     }
 
-    void execute(const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
+    void TurtleController::execute(const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
 
         auto feedback = std::make_shared<MoveTurtle::Feedback>();
         auto result = std::make_shared<MoveTurtle::Result>();
@@ -216,23 +193,6 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
     }
 
 
-
-    private:
-
-    std::string turtle_name_;
-    bool action_server_activated_;
-    std::mutex mutex_;
-    
-
-    rclcpp::Client<turtlesim::srv::Kill>::SharedPtr kill_client_;
-    rclcpp::Client<turtlesim::srv::Spawn>::SharedPtr spawn_client_;
-    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
-    
-    rclcpp_action::Server<my_turtle_interfaces::action::MoveTurtle>::SharedPtr move_turtle_server_;
-    rclcpp::CallbackGroup::SharedPtr cb_group_;
-    std::shared_ptr<MoveTurtleGoalHandle> goal_handle_;
-
-};
 
 
 int main(int argc, char **argv) {

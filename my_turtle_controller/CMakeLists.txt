@@ -14,6 +14,8 @@ find_package(turtlesim REQUIRED)
 find_package(my_turtle_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
+include_directories(include)
+
 add_executable(turtle_controller src/turtle_controller.cpp)
 ament_target_dependencies(turtle_controller rclcpp rclcpp_lifecycle rclcpp_action turtlesim my_turtle_interfaces geometry_msgs)
 

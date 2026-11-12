@@ -1,7 +1,8 @@
 #include "my_turtle_controller/turtle_controller.hpp"
 
+namespace my_turtle_controller {
 
-    TurtleController::TurtleController() : LifecycleNode("turtle_controller") {
+    TurtleController::TurtleController(const rclcpp::NodeOptions &options) : LifecycleNode("turtle_controller", options) {
         this->declare_parameter("turtle_name", "alan");
         turtle_name_ = this->get_parameter("turtle_name").as_string();
         action_server_activated_ = false;
@@ -192,19 +193,9 @@
 
     }
 
+} //namespace my_turtle_controller
 
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(my_turtle_controller::TurtleController);
 
-
-int main(int argc, char **argv) {
-    
-    rclcpp::init(argc, argv);
-
-    auto node = std::make_shared<TurtleController>();
-    rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(node->get_node_base_interface());
-    executor.spin();
-
-    rclcpp::shutdown();
-    return 0;
-}
 

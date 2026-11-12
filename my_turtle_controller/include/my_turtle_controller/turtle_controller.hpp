@@ -32,11 +32,14 @@ using MoveTurtle = my_turtle_interfaces::action::MoveTurtle;
 using MoveTurtleGoalHandle = rclcpp_action::ServerGoalHandle<MoveTurtle>;
 using namespace std::chrono_literals;
 
+
+namespace my_turtle_controller {
+
 class TurtleController : public rclcpp_lifecycle::LifecycleNode {
 
     public:
 
-    TurtleController();
+    TurtleController(const rclcpp::NodeOptions &options);
 
     LifecycleCallbackReturn on_configure(const rclcpp_lifecycle::State &previous_state) override;
 
@@ -78,3 +81,5 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
     std::shared_ptr<MoveTurtleGoalHandle> goal_handle_;
 
 };
+
+} //namespace my_turtle_controller

@@ -10,21 +10,6 @@
 #include <mutex>
 
 
-
-// TO DO 
-// ROZDZIEL NA SCR I INCLUDE
-// ROZDIEL PARAMS NA OBA NODY
-// SPRAWDZ CZY DZIALA
-// ZAREJESTRUJ COMPONEN
-// SPRAWEDZ CZY DZIALA
-// ZMIEN LAUNCH FILE NA COMPONENTOWY
-// SPRAEWDZ CZY DZIALA
-
-
-
-
-
-
 using KillTurtle = turtlesim::srv::Kill;
 using SpawnTurtle = turtlesim::srv::Spawn;
 using LifecycleCallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;

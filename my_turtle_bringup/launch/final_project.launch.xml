@@ -1,9 +1,26 @@
 <launch>
-    <node pkg="turtlesim" exec="turtlesim_node" name="turtlesim_node" output="screen" />
-    <node pkg="my_turtle_controller" exec="turtle_controller" name="turtle_controller" output="screen">
-        <param from="$(find-pkg-share my_turtle_bringup)/config/turtle_controller.yaml" />
+
+    <node pkg="turtlesim" exec="turtlesim_node" output="screen" />
+
+    <node_container
+        pkg="rclcpp_components"
+        exec="component_container_mt"
+        name="turtle_container"
+        namespace="/"
+        output="screen">
+
+        <composable_node
+            pkg="my_turtle_controller"
+            plugin="my_turtle_controller::TurtleController"
+            name="turtle_controller">
+
+            <param name="turtle_name" value="alan"/>
+        </composable_node>
+
+    </node_container>
+
+    <node pkg="my_turtle_bringup" exec="lifecycle_manager.py" output="screen">
+        <param name="managed_node_name" value="turtle_controller"/>
     </node>
-    <node pkg="my_turtle_bringup" exec="lifecycle_manager.py" name="lifecycle_manager" output="screen">
-        <param from="$(find-pkg-share my_turtle_bringup)/config/turtle_controller.yaml" />
-    </node>
+
 </launch>

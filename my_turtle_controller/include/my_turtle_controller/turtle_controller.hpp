@@ -40,6 +40,8 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
 
     void spawn_turtle();
 
+    void stop_turtle();
+
     rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID &uuid,
                                             std::shared_ptr<const MoveTurtle::Goal> goal);
 
@@ -55,6 +57,7 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
 
     std::string turtle_name_;
     bool action_server_activated_;
+    bool goal_received_;
     std::mutex mutex_;
     
 

@@ -242,7 +242,7 @@ void TurtleController::execute(
         cmd_vel_msg.angular.z = angular_z;
         cmd_vel_publisher_->publish(cmd_vel_msg);
 
-        feedback->distance_covered = linear_x * elapsed_time.seconds();
+        feedback->distance_covered = std::fabs(linear_x) * elapsed_time.seconds();
         feedback->time_left = duration.seconds() - elapsed_time.seconds();
         goal_handle->publish_feedback(feedback);
 

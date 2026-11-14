@@ -1,3 +1,6 @@
+# Move a turtle with specified velocities for a given duration.
+# Distance is measured in turtlesim units.
+
 float32 linear_vel_x
 float32 angular_vel_z
 int32 duration_s

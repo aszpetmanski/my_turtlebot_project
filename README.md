@@ -4,7 +4,7 @@ A small ROS 2 project demonstrating how to control a turtle in **turtlesim** or 
 
 Both simulations live in **the same repository** and share the `MoveTurtle` action interface. Choose which one to run by starting its corresponding launch file.
 
-The project focuses on ROS 2 communication patterns and node management rather than navigation or motion planning. Each action goal requests constant linear and angular velocities for a specified duration.
+The project focuses on ROS 2 communication patterns and node management rather than navigation or motion planning. Each action goal requests constant linear and angular velocities for a specified duration. The Gazebo controller also uses **odometry feedback** to track the actual distance traveled during a goal.
 
 ## Demos
 
@@ -29,9 +29,10 @@ The same action-based movement concept works in both environments. In Gazebo, th
 | **Lifecycle nodes** (`rclcpp_lifecycle`) | The controllers handle configuration, activation, deactivation, cleanup, and shutdown. |
 | **Custom actions** (`rclcpp_action`) | `MoveTurtle` accepts motion goals, publishes feedback, supports cancellation, and reports results. |
 | **Services** | The turtlesim controller calls `spawn` and `kill`; the lifecycle manager calls the controller's `change_state` service. The Gazebo controller does not need turtle spawning services. |
-| **Topics** | turtlesim uses `geometry_msgs/msg/Twist` on `/<turtle_name>/cmd_vel`; Gazebo uses `geometry_msgs/msg/TwistStamped` on `/cmd_vel`. |
+| **Topics** | turtlesim publishes `geometry_msgs/msg/Twist` to `/<turtle_name>/cmd_vel`; Gazebo publishes `geometry_msgs/msg/TwistStamped` to `/cmd_vel` and subscribes to `nav_msgs/msg/Odometry` on `/odom`. |
+| **Odometry** | The Gazebo controller uses successive `/odom` positions to accumulate distance traveled while an action goal is active. |
 | **Composition** (`rclcpp_components`) | The selected C++ controller runs in a multithreaded component container. |
-| **Callback groups** | A reentrant callback group allows callbacks to be handled by the multithreaded executor. |
+| **Callback groups** | Callback groups coordinate execution of controller callbacks in the multithreaded executor. |
 | **Parameters** | `turtle_name` configures the turtlesim turtle and action name; `managed_node_name` tells the manager which lifecycle node to control. |
 | **ROS 2 launch** | Separate XML launch files start either turtlesim or Gazebo, load the appropriate controller, and start the lifecycle manager. |
 
@@ -50,6 +51,7 @@ The same action-based movement concept works in both environments. In Gazebo, th
 | Action server | `/move_turtle_alan` | `/move_turtle` |
 | Velocity topic | `/alan/cmd_vel` | `/cmd_vel` |
 | Velocity message | `geometry_msgs/msg/Twist` | `geometry_msgs/msg/TwistStamped` |
+| Distance feedback | Estimate based on requested linear velocity and elapsed time | Integrated distance from `/odom` position updates |
 | Model setup | Controller spawns the turtle near `(5.54, 5.54)` during configuration | TurtleBot3 Gazebo launch starts the robot; the controller does not spawn or kill it |
 
 The action interface and lifecycle manager are reused, while the controller implementation and velocity topic match the selected simulation.
@@ -65,22 +67,41 @@ int32 duration_s
 # Result: whether the goal completed successfully.
 bool success
 ---
-# Feedback: estimated distance and remaining seconds.
+# Feedback: traveled distance and remaining seconds.
 float32 distance_covered
 int32 time_left
 ```
 
 A valid goal has a positive duration and linear/angular velocity magnitudes no greater than `3.0`. Only one goal is intended to execute at a time; overlapping goals are rejected.
 
-`distance_covered` is estimated from `abs(linear_vel_x) * elapsed_time`, rather than measured from odometry. For turtlesim this estimate is in turtlesim units. The integer `time_left` discards fractional seconds.
+`distance_covered` is calculated differently in each simulation:
+
+- **turtlesim:** estimated as `abs(linear_vel_x) * elapsed_time`, in turtlesim distance units.
+- **Gazebo:** calculated from odometry by summing the planar distance between consecutive positions received on `/odom` while a goal is active. This measures the simulated robot's traveled path rather than estimating it from the commanded velocity.
+
+The integer `time_left` discards fractional seconds.
+
+#### Gazebo odometry feedback
+
+The Gazebo controller subscribes to `/odom` (`nav_msgs/msg/Odometry`) and stores the latest position. For each new position while a goal is active, it accumulates:
+
+```text
+dx = current_x - previous_x
+dy = current_y - previous_y
+distance_covered += hypot(dx, dy)
+```
+
+The previous position is updated on every odometry message, including when no goal is running, so movement outside a goal is not continuously added to the reported distance. The controller requires an odometry message before accepting a movement goal; if odometry has not arrived yet, it rejects the goal.
+
+This uses the robot's 2D odometry position (`x`, `y`), not wheel rotations or the commanded velocity. Like any odometry-based measurement, its accuracy depends on the quality and frequency of the published odometry.
 
 ## Requirements
 
 - Linux with a working ROS 2 installation (for example, ROS 2 Jazzy).
 - `colcon` and `rosdep`.
-- ROS 2 packages including `rclcpp`, `rclcpp_lifecycle`, `rclcpp_action`, `rclcpp_components`, `rclpy`, `lifecycle_msgs`, `geometry_msgs`, `action_msgs`, and the launch packages.
+- ROS 2 packages including `rclcpp`, `rclcpp_lifecycle`, `rclcpp_action`, `rclcpp_components`, `rclpy`, `lifecycle_msgs`, `geometry_msgs`, `nav_msgs`, `action_msgs`, and the launch packages.
 - `turtlesim` for the turtlesim variant.
-- `turtlebot3_gazebo` and its TurtleBot3 simulation dependencies for the Gazebo variant.
+- `turtlebot3_gazebo` and its TurtleBot3 simulation dependencies for the Gazebo variant, including the odometry publisher/bridge.
 - The packages from this repository, including `my_turtle_interfaces`.
 
 ## Build
@@ -130,7 +151,7 @@ ros2 launch my_turtle_bringup final_project_gz.launch.xml
 
 This launch file sets `TURTLEBOT3_MODEL=waffle_pi`, includes `turtlebot3_gazebo`'s `empty_world.launch.py`, loads the `my_turtle_controller_gz::TurtleController` component into a multithreaded container, and starts the **same Python lifecycle manager**.
 
-Unlike the turtlesim version, the Gazebo controller does not call `spawn` or `kill`. It sends stamped velocity commands to `/cmd_vel` and exposes the action server as `/move_turtle`.
+Unlike the turtlesim version, the Gazebo controller does not call `spawn` or `kill`. It sends stamped velocity commands to `/cmd_vel`, listens for odometry on `/odom`, and exposes the action server as `/move_turtle`.
 
 For **either** launch, the manager requests `configure`, waits briefly, then requests `activate`. Check the system from another sourced terminal:
 
@@ -141,6 +162,12 @@ ros2 lifecycle get /turtle_controller
 ```
 
 The lifecycle node should normally be `active`. The action list should show `/move_turtle_alan` for turtlesim or `/move_turtle` for Gazebo.
+
+For Gazebo, check that odometry is available before sending a goal:
+
+```bash
+ros2 topic echo /odom --once
+```
 
 ## Send a movement goal
 
@@ -174,7 +201,7 @@ ros2 action send_goal /move_turtle \
   --feedback
 ```
 
-While either goal runs, feedback includes `distance_covered` and `time_left`. On successful completion, the action returns `success: true` and the controller sends a stop command.
+While either goal runs, feedback includes `distance_covered` and `time_left`. For Gazebo, `distance_covered` comes from the odometry readings. On successful completion, the action returns `success: true` and the controller sends a stop command.
 
 ## Cancel an active goal
 
@@ -224,7 +251,7 @@ Run these commands in an appropriate order: for example, **deactivate before cle
 
 The Gazebo variant extends the original turtlesim exercise **within this repository**, keeping the shared action interface, composable-node architecture, and automatic lifecycle management.
 
-The main differences are that the launch file starts a TurtleBot3 Waffle Pi in Gazebo, the controller no longer creates or removes a turtle, and movement commands are published as `TwistStamped` messages to `/cmd_vel`. It is still a timed velocity controller, not a navigation or motion-planning system.
+The main differences are that the launch file starts a TurtleBot3 Waffle Pi in Gazebo, the controller no longer creates or removes a turtle, movement commands are published as `TwistStamped` messages to `/cmd_vel`, and movement feedback is calculated using `/odom`. It is still a timed velocity controller, not a navigation or motion-planning system.
 
 ## Inspiration & credits
 

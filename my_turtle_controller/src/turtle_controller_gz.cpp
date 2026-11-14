@@ -20,23 +20,29 @@ TurtleController::TurtleController(const rclcpp::NodeOptions &options)
     // prevents overlapping goals, including goals still awaiting execution.
     action_server_activated_ = false;
     goal_received_ = false;
-
+    odom_received_ = false;
+    has_previous_pose_ = false;
+    distance_covered_ = 0.0;
+    
     cb_group_ = create_callback_group(rclcpp::CallbackGroupType::Reentrant);
     RCLCPP_INFO(get_logger(), "Turtle controller initialized. Waiting for configuration.");
 }
 
 LifecycleCallbackReturn TurtleController::on_configure(
     const rclcpp_lifecycle::State &previous_state) {
-    (void)previous_state;
-
-    
-    cmd_vel_publisher_ = create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 10);
-
-    move_turtle_server_ = rclcpp_action::create_server<MoveTurtle>(
-        this, "move_turtle",
-        [this](const rclcpp_action::GoalUUID &uuid,
+        (void)previous_state;
+        
+        rclcpp::SubscriptionOptions options;
+        options.callback_group = cb_group_;
+        
+        cmd_vel_publisher_ = create_publisher<geometry_msgs::msg::TwistStamped>("/cmd_vel", 10);
+        odom_subscriber_ = create_subscription<nav_msgs::msg::Odometry>("/odom", rclcpp::SensorDataQoS(), [this](const nav_msgs::msg::Odometry::SharedPtr msg){odom_callback(msg);}, options);
+        
+        move_turtle_server_ = rclcpp_action::create_server<MoveTurtle>(
+            this, "move_turtle",
+            [this](const rclcpp_action::GoalUUID &uuid,
                std::shared_ptr<const MoveTurtle::Goal> goal) {
-            return handle_goal(uuid, goal);
+                   return handle_goal(uuid, goal);
         },
         [this](const std::shared_ptr<MoveTurtleGoalHandle> goal_handle) {
             return handle_cancel(goal_handle);
@@ -45,6 +51,7 @@ LifecycleCallbackReturn TurtleController::on_configure(
             handle_accepted(goal_handle);
         },
         rcl_action_server_get_default_options(), cb_group_);
+        
 
     RCLCPP_INFO(get_logger(),
                 "Turtle controller configured. Action server: /move_turtle");
@@ -60,6 +67,8 @@ LifecycleCallbackReturn TurtleController::on_cleanup(
 
     action_server_activated_ = false;
     goal_received_ = false;
+    has_previous_pose_ = false;
+    distance_covered_ = 0.0;
     return LifecycleCallbackReturn::SUCCESS;
 }
 
@@ -101,6 +110,28 @@ void TurtleController::stop_turtle() {
     cmd_vel_publisher_->publish(cmd_vel_msg);
 }
 
+void TurtleController::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+
+    if (msg) {
+        
+        std::lock_guard<std::mutex> lock(mutex_);
+        odom_received_ = true;
+        current_pose_ = msg->pose.pose.position;
+
+        // Guard against no previous pose + we dont calculate distance traveled outside of action goal
+        if (has_previous_pose_ && goal_received_) {
+            float dx = current_pose_.x - previous_pose_.x;
+            float dy = current_pose_.y - previous_pose_.y;
+
+            distance_covered_ += std::hypotf(dx, dy);
+        }
+
+
+        previous_pose_ = current_pose_;
+        has_previous_pose_ = true;
+}
+}
+
 rclcpp_action::GoalResponse TurtleController::handle_goal(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const MoveTurtle::Goal> goal) {
@@ -113,6 +144,10 @@ rclcpp_action::GoalResponse TurtleController::handle_goal(
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!odom_received_) {
+            RCLCPP_WARN(get_logger(), "Rejecting goal: Odometry not available yet.");
+            return rclcpp_action::GoalResponse::REJECT;
+        }
         if (goal_received_) {
             RCLCPP_WARN(get_logger(), "Rejecting goal: another goal is being processed.");
             return rclcpp_action::GoalResponse::REJECT;
@@ -166,6 +201,11 @@ void TurtleController::execute(
     rclcpp::Duration duration = rclcpp::Duration::from_seconds(action_duration);
     rclcpp::Time start_time = now();
     rclcpp::Rate rate(30.0);
+    
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        distance_covered_ = 0.0;
+    }
     RCLCPP_INFO(get_logger(), "Executing goal.");
 
     // At 30 Hz, check for cancellation, completion, or deactivation before
@@ -208,7 +248,14 @@ void TurtleController::execute(
         cmd_vel_msg.twist.angular.z = angular_z;
         cmd_vel_publisher_->publish(cmd_vel_msg);
 
-        feedback->distance_covered = std::fabs(linear_x) * elapsed_time.seconds();
+        float local_distance_covered;
+        
+        {
+        std::lock_guard<std::mutex> lock(mutex_);
+        local_distance_covered = distance_covered_;
+        }
+
+        feedback->distance_covered = local_distance_covered;
         feedback->time_left = duration.seconds() - elapsed_time.seconds();
         goal_handle->publish_feedback(feedback);
 

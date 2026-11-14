@@ -3,6 +3,8 @@
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "my_turtle_interfaces/action/move_turtle.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
+#include "geometry_msgs/msg/point.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 
 #include <mutex>
 #include <cmath>
@@ -35,6 +37,8 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
 
     void stop_turtle();
 
+    void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
+
     rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID &uuid,
                                             std::shared_ptr<const MoveTurtle::Goal> goal);
 
@@ -50,9 +54,15 @@ class TurtleController : public rclcpp_lifecycle::LifecycleNode {
 
     bool action_server_activated_;
     bool goal_received_;
+    bool odom_received_;
+    bool has_previous_pose_;
     std::mutex mutex_;
+    geometry_msgs::msg::Point current_pose_;
+    geometry_msgs::msg::Point previous_pose_;
+    float distance_covered_;
     
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_publisher_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_subscriber_;
     rclcpp_action::Server<my_turtle_interfaces::action::MoveTurtle>::SharedPtr move_turtle_server_;
     rclcpp::CallbackGroup::SharedPtr cb_group_;
     std::shared_ptr<MoveTurtleGoalHandle> goal_handle_;

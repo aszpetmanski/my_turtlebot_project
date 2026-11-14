@@ -14,6 +14,7 @@ find_package(rclcpp_components REQUIRED)
 find_package(turtlesim REQUIRED)
 find_package(my_turtle_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 include_directories(include)
 
@@ -22,7 +23,7 @@ ament_target_dependencies(turtle_controller rclcpp rclcpp_lifecycle rclcpp_actio
 rclcpp_components_register_nodes(turtle_controller "my_turtle_controller::TurtleController")
 
 add_library(turtle_controller_gz SHARED src/turtle_controller_gz.cpp)
-ament_target_dependencies(turtle_controller_gz rclcpp rclcpp_lifecycle rclcpp_action rclcpp_components my_turtle_interfaces geometry_msgs)
+ament_target_dependencies(turtle_controller_gz rclcpp rclcpp_lifecycle rclcpp_action rclcpp_components my_turtle_interfaces geometry_msgs nav_msgs)
 rclcpp_components_register_nodes(turtle_controller_gz "my_turtle_controller_gz::TurtleController")
 
 install(TARGETS

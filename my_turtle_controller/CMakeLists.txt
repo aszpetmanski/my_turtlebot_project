@@ -21,8 +21,13 @@ add_library(turtle_controller SHARED src/turtle_controller.cpp)
 ament_target_dependencies(turtle_controller rclcpp rclcpp_lifecycle rclcpp_action rclcpp_components turtlesim my_turtle_interfaces geometry_msgs)
 rclcpp_components_register_nodes(turtle_controller "my_turtle_controller::TurtleController")
 
+add_library(turtle_controller_gz SHARED src/turtle_controller_gz.cpp)
+ament_target_dependencies(turtle_controller_gz rclcpp rclcpp_lifecycle rclcpp_action rclcpp_components my_turtle_interfaces geometry_msgs)
+rclcpp_components_register_nodes(turtle_controller_gz "my_turtle_controller_gz::TurtleController")
+
 install(TARGETS
   turtle_controller
+  turtle_controller_gz
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

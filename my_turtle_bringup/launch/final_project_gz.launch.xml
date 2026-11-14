@@ -1,0 +1,31 @@
+<launch>
+    <!-- Set TurtleBot3 model -->
+    <set_env name="TURTLEBOT3_MODEL" value="waffle_pi"/>
+
+    <!-- Include TurtleBot3 Gazebo launch file -->
+    <include file="$(find-pkg-share turtlebot3_gazebo)/launch/empty_world.launch.py"/>
+
+
+    <!-- Start a multithreaded container for composable ROS 2 nodes. -->
+    <node_container
+        pkg="rclcpp_components"
+        exec="component_container_mt"
+        name="turtle_container"
+        namespace="/"
+        output="screen">
+
+        <!-- Load the turtle controller component. -->
+        <composable_node
+            pkg="my_turtle_controller"
+            plugin="my_turtle_controller_gz::TurtleController"
+            name="turtle_controller">
+        </composable_node>
+
+    </node_container>
+
+    <!-- Start the lifecycle manager to configure and activate the controller. -->
+    <node pkg="my_turtle_bringup" exec="lifecycle_manager.py" output="screen">
+        <param name="managed_node_name" value="turtle_controller"/>
+    </node>
+
+</launch>

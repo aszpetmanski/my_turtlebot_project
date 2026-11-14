@@ -1,11 +1,13 @@
 <launch>
-
+    <!-- Launch the turtlesim simulator. -->
     <node pkg="turtlesim" exec="turtlesim_node" output="screen" />
 
+    <!-- Remove the default turtle to make room for the custom one. -->
     <executable
-    cmd="ros2 service call /kill turtlesim/srv/Kill '{name: turtle1}'"
-    output="screen" />
+        cmd="ros2 service call /kill turtlesim/srv/Kill '{name: turtle1}'"
+        output="screen" />
 
+    <!-- Start a multithreaded container for composable ROS 2 nodes. -->
     <node_container
         pkg="rclcpp_components"
         exec="component_container_mt"
@@ -13,6 +15,7 @@
         namespace="/"
         output="screen">
 
+        <!-- Load the turtle controller component and configure its turtle name. -->
         <composable_node
             pkg="my_turtle_controller"
             plugin="my_turtle_controller::TurtleController"
@@ -23,6 +26,7 @@
 
     </node_container>
 
+    <!-- Start the lifecycle manager to configure and activate the controller. -->
     <node pkg="my_turtle_bringup" exec="lifecycle_manager.py" output="screen">
         <param name="managed_node_name" value="turtle_controller"/>
     </node>

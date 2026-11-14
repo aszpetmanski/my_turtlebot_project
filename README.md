@@ -17,7 +17,7 @@ The project focuses on ROS 2 communication patterns and node management rather t
 ### TurtleBot3 Waffle Pi in Gazebo
 
 <p align="center">
-  <img src="assets/demo_gazebo.png" alt="TurtleBot3 Waffle Pi controlled through the MoveTurtle action in Gazebo" width="900">
+  <img src="assets/demo_gazebo.gif" alt="TurtleBot3 Waffle Pi controlled through the MoveTurtle action in Gazebo" width="900">
 </p>
 
 The same action-based movement concept works in both environments. In Gazebo, the robot is launched by `turtlebot3_gazebo` rather than spawned and removed by the controller.
